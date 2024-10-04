@@ -1,0 +1,13 @@
+/* styles.css */
+
+.goodreads-rating {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  background-color: #f9f9f9;
+}
+
+.goodreads-rating p {
+  margin: 5px 0;
+  font-size: 14px;
+}
