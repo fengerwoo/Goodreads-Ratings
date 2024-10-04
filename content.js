@@ -30,10 +30,12 @@ function parseBookData(html) {
       const nameElement = container.querySelector('.authorName span[itemprop="name"]');
       const name = nameElement ? nameElement.textContent.trim() : '';
 
-      const roleElement = container.querySelector('.authorName__container .role');
-      const role = roleElement ? roleElement.textContent.trim() : '';
+      // const roleElement = container.querySelector('.authorName__container .role');
+      // const role = roleElement ? roleElement.textContent.trim() : '';
 
-      return role ? `${name} ${role}` : name;
+      // return role ? `${name} ${role}` : name;
+
+      return name;
     }).join(', ');
 
     return {
@@ -61,6 +63,66 @@ function addRatingContainer(bookElement) {
   ratingDiv.textContent = 'Goodreads 评分查询中...';
   bookElement.appendChild(ratingDiv);
   return ratingDiv;
+}
+
+// 计算两个字符串相似度
+function calculateSimilarityForString(str1, str2) {
+    // 将字符串转换为小写并拆分为单词
+    const toWordArray = (str) => {
+        return str
+            .toLowerCase()
+            .replace(/[^\w\s]/g, '') // 移除标点符号
+            .split(/\s+/)
+            .filter(word => word.length > 0);
+    };
+
+    const words1 = toWordArray(str1);
+    const words2 = toWordArray(str2);
+
+    // 计算词频
+    const countWords = (words) => {
+        const wordCount = {};
+        for (let word of words) {
+            wordCount[word] = (wordCount[word] || 0) + 1;
+        }
+        return wordCount;
+    };
+
+    const freq1 = countWords(words1);
+    const freq2 = countWords(words2);
+
+    // 获取所有唯一的单词集合
+    const allWords = new Set([...Object.keys(freq1), ...Object.keys(freq2)]);
+
+    // 创建向量
+    const vector1 = [];
+    const vector2 = [];
+    allWords.forEach(word => {
+        vector1.push(freq1[word] || 0);
+        vector2.push(freq2[word] || 0);
+    });
+
+    // 计算点积和模长
+    const dotProduct = vector1.reduce((sum, val, idx) => sum + val * vector2[idx], 0);
+    const magnitude1 = Math.sqrt(vector1.reduce((sum, val) => sum + val * val, 0));
+    const magnitude2 = Math.sqrt(vector2.reduce((sum, val) => sum + val * val, 0));
+
+    if (magnitude1 === 0 || magnitude2 === 0) {
+        return 0;
+    }
+
+    // 计算余弦相似度
+    const cosineSimilarity = dotProduct / (magnitude1 * magnitude2);
+
+    return cosineSimilarity;
+}
+
+// 计算两本书的相似度，根据书名、作者名
+function calculateSimilarityForBook(book_name_1, book_author_1, book_name_2, book_author_2) {
+  const nameSimilarity = calculateSimilarityForString(book_name_1, book_name_2);
+  const authorSimilarity = calculateSimilarityForString(book_author_1, book_author_2);
+  const sumSimilarity = (nameSimilarity + authorSimilarity) / 2;
+  return sumSimilarity > 0.5;
 }
 
 // 获取书名并查询Goodreads
@@ -167,10 +229,15 @@ async function addGoodreadsRatings() {
         const ratingContainer = addRatingContainer(bookElement);
         const ratingData = await fetchGoodreadsRating(bookTitle + " " + bookAuthor);
         const goodreadsSearchURL = `https://www.goodreads.com/search?utf8=%E2%9C%93&q=${encodeURIComponent(bookTitle + " " + bookAuthor)}&search_type=books`;
-
+        
         if (ratingData) {
+          let bookSimilarity = false;
+          if(ratingData.book_name && ratingData.Author && ratingData.avg_rating){
+            bookSimilarity = calculateSimilarityForBook(bookTitle, bookAuthor, ratingData.book_name, ratingData.Author);
+          }
+
           ratingContainer.innerHTML = `
-            <p><strong>Goodreads 评分匹配书籍:</strong> <a target="_blank" href="${goodreadsSearchURL}">《${ratingData.book_name || 'N/A'}》 作者：${ratingData.Author || 'N/A'}</a></p>
+            <p><strong> ${bookSimilarity?"✅":"⚠️"} Goodreads 评分匹配书籍:</strong> <a target="_blank" href="${goodreadsSearchURL}">《${ratingData.book_name || 'N/A'}》 作者：${ratingData.Author || 'N/A'}</a></p>
             <p><strong>评分:</strong> ${ratingData.avg_rating || 'N/A'} / 5</p>
             <p><strong>评分数量:</strong> ${ratingData.ratings ? ratingData.ratings.toLocaleString() : 'N/A'}</p>
             <p><strong>出版年份:</strong> ${ratingData.published || 'N/A'}</p>
@@ -214,8 +281,13 @@ async function addGoodreadsRatings() {
           const goodreadsSearchURL = `https://www.goodreads.com/search?utf8=%E2%9C%93&q=${encodeURIComponent(bookTitle + " " + bookAuthor)}&search_type=books`;
 
           if (ratingData) {
+            let bookSimilarity = false;
+            if(ratingData.book_name && ratingData.Author && ratingData.avg_rating){
+              bookSimilarity = calculateSimilarityForBook(bookTitle, bookAuthor, ratingData.book_name, ratingData.Author);
+            }
+
             ratingContainer.innerHTML = `
-              <p><strong>Goodreads 评分匹配书籍:</strong> <a target="_blank" href="${goodreadsSearchURL}">《${ratingData.book_name || 'N/A'}》 作者：${ratingData.Author || 'N/A'}</a></p>
+              <p><strong> ${bookSimilarity?"✅":"⚠️"} Goodreads 评分匹配书籍:</strong> <a target="_blank" href="${goodreadsSearchURL}">《${ratingData.book_name || 'N/A'}》 作者：${ratingData.Author || 'N/A'}</a></p>
               <p><strong>评分:</strong> ${ratingData.avg_rating || 'N/A'} / 5</p>
               <p><strong>评分数量:</strong> ${ratingData.ratings ? ratingData.ratings.toLocaleString() : 'N/A'}</p>
               <p><strong>出版年份:</strong> ${ratingData.published || 'N/A'}</p>
